@@ -1,0 +1,47 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "lancamentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "obra_id", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "lancamentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "planilha_id", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "lancamentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "origem", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ordens_compra",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "obra_id", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "alocacoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "funcionario_id", "order": "ASCENDING" },
+        { "fieldPath": "data_fim", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

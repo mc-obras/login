@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0F2044">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MC Obras">
+  <link rel="manifest" href="manifest.json">
+  <title>Marques Caetano · Gestão de Obras</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo-wrap">
+      <div class="auth-logo-icon">MC</div>
+      <div>
+        <div class="auth-logo-text">Marques Caetano</div>
+        <div class="auth-logo-sub">Gestão de Obras · Sistema Interno</div>
+      </div>
+    </div>
+
+    <h1 class="auth-title">Bem-vindo</h1>
+    <p class="auth-subtitle">Entre com sua conta para acessar o sistema</p>
+
+    <div class="form-group">
+      <label class="form-label">E-mail</label>
+      <input id="login-email" class="form-input" type="email" placeholder="seu@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Senha</label>
+      <input id="login-pass" class="form-input" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <div id="login-error" style="color:var(--danger);font-size:12px;margin-bottom:10px;min-height:16px"></div>
+
+    <button class="btn btn-primary btn-lg btn-full" onclick="doLogin()">Entrar →</button>
+
+    <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:24px">
+      Acesso restrito. Contate o administrador para criar conta.
+    </p>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app-shell" style="display:none;flex-direction:row">
+
+  <!-- SIDEBAR (desktop) -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">MC</div>
+      <div>
+        <div class="sidebar-logo-text">Marques Caetano</div>
+        <div class="sidebar-logo-sub">Gestão de Obras</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label" id="lbl-principal">Principal</div>
+
+      <button class="nav-item" data-page="dashboard" onclick="App.navigate('dashboard')">
+        <span class="nav-icon">📊</span> Dashboard
+      </button>
+      <button class="nav-item" data-page="obras" onclick="App.navigate('obras')">
+        <span class="nav-icon">🏗</span> Obras
+      </button>
+      <button class="nav-item" data-page="planilhas" onclick="App.navigate('planilhas')">
+        <span class="nav-icon">📋</span> Planilhas
+      </button>
+
+      <div class="sidebar-section-label">Equipe</div>
+      <button class="nav-item" data-page="funcionarios" onclick="App.navigate('funcionarios')">
+        <span class="nav-icon">👷</span> Funcionários
+      </button>
+      <button class="nav-item" data-page="presenca" onclick="App.navigate('presenca')">
+        <span class="nav-icon">📅</span> Controle de Presença
+      </button>
+      <button class="nav-item" data-page="horas_extras" onclick="App.navigate('horas_extras')">
+        <span class="nav-icon">⏱</span> Horas Extras
+      </button>
+
+      <div class="sidebar-section-label">Financeiro</div>
+      <button class="nav-item" data-page="ordens_compra" onclick="App.navigate('ordens_compra')">
+        <span class="nav-icon">📄</span> Ordens de Compra
+      </button>
+      <button class="nav-item" data-page="lancamentos" onclick="App.navigate('lancamentos')">
+        <span class="nav-icon">📊</span> Lançamentos
+      </button>
+
+      <div class="sidebar-section-label">Sistema</div>
+      <button class="nav-item" data-page="configuracoes" onclick="App.navigate('configuracoes')">
+        <span class="nav-icon">⚙</span> Configurações
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-user-avatar" id="sb-user-initials">—</div>
+        <div>
+          <div id="sb-perfil-badge" style="font-size:10px;color:var(--text3);margin-bottom:2px"></div>
+          <div class="sidebar-user-email" id="sb-user-email"></div>
+        </div>
+      </div>
+      <button class="sidebar-logout" onclick="doLogout()">↩ Sair da conta</button>
+    </div>
+  </aside>
+
+  <!-- MAIN AREA -->
+  <div class="main-area" style="flex:1;display:flex;flex-direction:column">
+
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+      <div class="mobile-logo">
+        <div class="mobile-logo-icon">MC</div>
+        <span class="mobile-logo-text">Marques Caetano</span>
+      </div>
+      <span id="mobile-date" style="font-size:11px;color:rgba(255,255,255,.5)"></span>
+    </header>
+
+    <!-- Desktop Topbar -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <span id="topbar-title" class="topbar-title">Dashboard</span>
+      </div>
+      <div class="topbar-right">
+        <span id="topbar-date" class="topbar-date"></span>
+        <button id="btn-lanc-top" class="btn btn-primary btn-sm" onclick="showNovoLancamento()">+ Lançamento</button>
+      </div>
+    </div>
+
+    <!-- Alertas de saldo crítico -->
+    <div id="alertas-banner" style="display:none;padding:12px 20px 0"></div>
+
+    <!-- Content -->
+    <main id="main-content">
+      <div class="page-loading"><div class="spinner"></div><span>Carregando...</span></div>
+    </main>
+
+    <!-- Bottom Nav (mobile) -->
+    <nav class="bottom-nav">
+      <div class="bottom-nav-inner">
+        <button class="bottom-nav-item" data-page="dashboard" onclick="App.navigate('dashboard')">
+          <span class="bni-icon">📊</span>Dashboard
+        </button>
+        <button class="bottom-nav-item" data-page="obras" onclick="App.navigate('obras')">
+          <span class="bni-icon">🏗</span>Obras
+        </button>
+        <button class="bottom-nav-item" data-page="planilhas" onclick="App.navigate('planilhas')">
+          <span class="bni-icon">📋</span>Planilhas
+        </button>
+        <button class="bottom-nav-item" data-page="funcionarios" onclick="App.navigate('funcionarios')">
+          <span class="bni-icon">👷</span>Equipe
+        </button>
+        <button class="bottom-nav-item" data-page="presenca" onclick="App.navigate('presenca')">
+          <span class="bni-icon">📅</span>Presença
+        </button>
+        <button class="bottom-nav-item" data-page="horas_extras" onclick="App.navigate('horas_extras')">
+          <span class="bni-icon">⏱</span>H.Extra
+        </button>
+        <button class="bottom-nav-item" data-page="ordens_compra" onclick="App.navigate('ordens_compra')">
+          <span class="bni-icon">📄</span>OCs
+        </button>
+        <button class="bottom-nav-item" data-page="lancamentos" onclick="App.navigate('lancamentos')">
+          <span class="bni-icon">📋</span>Lançamentos
+        </button>
+        <button class="bottom-nav-item" data-page="configuracoes" onclick="App.navigate('configuracoes')">
+          <span class="bni-icon">⚙</span>Config
+        </button>
+      </div>
+    </nav>
+
+  </div><!-- /main-area -->
+</div><!-- /app-shell -->
+
+<!-- FAB mobile -->
+<button class="fab" onclick="showNovoLancamento()" title="Novo lançamento">＋</button>
+
+<!-- Modal -->
+<div id="modal-overlay"></div>
+
+<!-- Toasts -->
+<div id="toast-wrap"></div>
+
+<!-- Loading overlay -->
+<div id="loading-overlay"><div class="spinner" style="width:40px;height:40px"></div></div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+<!-- Configuração Firebase -->
+<script src="firebase-config.js"></script>
+
+<!-- App -->
+<script src="js/app.js"></script>
+<script src="js/obras.js"></script>
+<script src="js/pages.js"></script>
+<script src="js/config.js"></script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const dataStr = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    document.getElementById('topbar-date').textContent = dataStr;
+    document.getElementById('mobile-date').textContent = new Date().toLocaleDateString('pt-BR',{month:'short',year:'numeric'});
+
+    document.getElementById('login-email').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+    document.getElementById('login-pass').addEventListener('keydown',  e => { if(e.key==='Enter') doLogin(); });
+  });
+</script>
+
+</body>
+</html>
