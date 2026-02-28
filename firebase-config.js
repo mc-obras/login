@@ -3,12 +3,12 @@
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyArH4B84JxGLVoVqIzHSMqdmakbLIlaWTA",
-  authDomain: "marques-caetano-obras.firebaseapp.com",
-  projectId: "marques-caetano-obras",
-  storageBucket: "marques-caetano-obras.firebasestorage.app",
-  messagingSenderId: "953286188179",
-  appId: "1:953286188179:web:397348af439807970a8166"
+  apiKey: "AIzaSyDxIWtcWhyXcelszSwkGw623jmMU6UoNiY",
+    authDomain: "marques-caetano-obras-bcef6.firebaseapp.com",
+    projectId: "marques-caetano-obras-bcef6",
+    storageBucket: "marques-caetano-obras-bcef6.firebasestorage.app",
+    messagingSenderId: "542851788810",
+    appId: "1:542851788810:web:98271256d48147d0ff2ff3"
 };
 
 firebase.initializeApp(firebaseConfig);
