@@ -26,4 +26,4 @@ const EMPRESA_ID = "marques-caetano";
 //    e substitua "helloworld" pela sua chave pessoal
 // Limite gratuito: 500 req/dia, 25.000/mês — mais que suficiente
 // ============================================================
-window.OCRSPACE_API_KEY = "K86359532788957";  // substitua pela sua chave pessoal se necessário
+window.OCRSPACE_API_KEY = "K81315400588957";  // substitua pela sua chave pessoal se necessário
