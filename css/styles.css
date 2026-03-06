@@ -370,11 +370,12 @@ html, body {
   position: fixed;
   bottom: 0;
   left: 0; right: 0;
-  height: 62px;
+  height: 68px;
   background: var(--blue-900);
-  border-top: 1px solid rgba(255,255,255,.08);
-  z-index: 100;
+  border-top: 1px solid rgba(255,255,255,.1);
+  z-index: 200;
   padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -4px 20px rgba(0,0,0,.25);
 }
 
 .bottom-nav-inner {
@@ -389,27 +390,135 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   height: 100%;
   cursor: pointer;
-  color: rgba(255,255,255,.4);
-  font-size: 9.5px;
+  color: rgba(255,255,255,.45);
+  font-size: 10px;
   font-weight: 600;
   border: none;
   background: none;
-  transition: color .15s;
+  transition: color .15s, transform .1s;
   letter-spacing: .2px;
   font-family: inherit;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.bottom-nav-item:active { transform: scale(.92); }
+
+.bottom-nav-item .bni-icon { font-size: 23px; line-height: 1; }
+.bottom-nav-item.active    { color: var(--blue-300); }
+
+/* Botão "Mais" */
+.bni-mais .bni-mais-icon {
+  font-size: 20px;
+  width: 36px; height: 36px;
+  background: rgba(255,255,255,.08);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+}
+.bni-mais.active .bni-mais-icon {
+  background: var(--blue-600);
+  color: white;
 }
 
-.bottom-nav-item .bni-icon { font-size: 20px; line-height: 1; }
-.bottom-nav-item.active    { color: var(--blue-300); }
+/* ── MAIS DRAWER ──────────────────────────────────────────── */
+#mais-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 290;
+  opacity: 0;
+  transition: opacity .25s;
+  backdrop-filter: blur(2px);
+}
+#mais-overlay.open {
+  display: block;
+  opacity: 1;
+}
+
+#mais-drawer {
+  position: fixed;
+  bottom: 0;
+  left: 0; right: 0;
+  background: var(--blue-900);
+  border-radius: 20px 20px 0 0;
+  z-index: 300;
+  padding: 12px 20px 32px;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  transform: translateY(110%);
+  transition: transform .28s cubic-bezier(.32,.72,0,1);
+  border-top: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 -8px 40px rgba(0,0,0,.4);
+}
+#mais-drawer.open {
+  transform: translateY(0);
+}
+
+.mais-handle {
+  width: 40px; height: 4px;
+  background: rgba(255,255,255,.2);
+  border-radius: 2px;
+  margin: 0 auto 20px;
+}
+
+.mais-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.mais-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 8px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  color: rgba(255,255,255,.8);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s, transform .1s, color .15s;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.mais-item:active {
+  transform: scale(.94);
+  background: rgba(255,255,255,.12);
+}
+.mais-item.active {
+  background: rgba(96,165,250,.15);
+  border-color: var(--blue-400);
+  color: var(--blue-300);
+}
+
+.mais-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.mais-item-logout {
+  background: rgba(220,38,38,.08);
+  border-color: rgba(220,38,38,.2);
+  color: rgba(255,100,100,.8);
+}
+.mais-item-logout:active {
+  background: rgba(220,38,38,.18);
+}
 
 /* ── FAB ──────────────────────────────────────────────────── */
 .fab {
   position: fixed;
-  bottom: 76px;
+  bottom: 82px;
   right: 18px;
   width: 52px; height: 52px;
   background: linear-gradient(135deg, var(--blue-600), var(--blue-500));
@@ -1345,7 +1454,7 @@ select.form-input {
   .sidebar, .topbar { display: none !important; }
   #app-shell { flex-direction: column !important; }
   .main-area { min-height: 0; width: 100%; }
-  #main-content { padding: 14px 12px 90px; overflow-x: hidden; }
+  #main-content { padding: 14px 12px 100px; overflow-x: hidden; }
 
   /* Mobile nav */
   .mobile-header { display: flex; }
@@ -1430,10 +1539,13 @@ select.form-input {
   .dash-grid.triple { grid-template-columns: 1fr 1fr; }
 }
 
+/* Ocultar elementos mobile no desktop */
+@media (min-width: 769px) {
+  #mais-drawer, #mais-overlay { display: none !important; }
+}
+
 @media (min-width: 1200px) {
   :root { --sidebar-w: 272px; }
   #main-content { padding: 32px 36px; }
   .stats-grid { grid-template-columns: repeat(4, 1fr); }
 }
-
-
