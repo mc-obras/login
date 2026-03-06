@@ -31,14 +31,25 @@ async function verificarSaldoCritico() {
 
   if (alertas.length === 0) return;
 
+  // Alertas já dispensados na sessão atual
+  if (!window._alertasDismissed) window._alertasDismissed = new Set();
+
+  const alertasFiltrados = alertas.filter((_, i) => !window._alertasDismissed.has(i));
+  if (alertasFiltrados.length === 0) return;
+
   // Mostra badge no menu e banner no topo do conteúdo
   const banner = document.getElementById('alertas-banner');
   if (banner) {
     banner.style.display = '';
-    banner.innerHTML = alertas.map(a => `
-      <div class="alert danger" onclick="App.navigate('obra_detail',{id:'${a.obraId}'})" style="cursor:pointer;margin-bottom:6px">
-        <span class="alert-icon">⚠</span>
-        <span>${a.msg} — <u>Ver obra</u></span>
+    banner.innerHTML = alertas.map((a, i) => window._alertasDismissed.has(i) ? '' : `
+      <div class="alert danger" id="alerta-item-${i}" style="cursor:pointer;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex:1" onclick="App.navigate('obra_detail',{id:'${a.obraId}'})">
+          <span class="alert-icon">⚠</span>
+          <span>${a.msg} — <u>Ver obra</u></span>
+        </div>
+        <button onclick="dispensarAlerta(${i}, event)" title="Dispensar aviso"
+          style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:18px;font-weight:700;line-height:1;padding:0 4px;flex-shrink:0;opacity:0.7"
+          onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">✕</button>
       </div>`).join('');
   }
 
@@ -47,12 +58,40 @@ async function verificarSaldoCritico() {
     if (!el.querySelector('.alert-badge')) {
       const badge = document.createElement('span');
       badge.className = 'alert-badge';
-      badge.textContent = alertas.length;
+      badge.textContent = alertasFiltrados.length;
       badge.style.cssText = 'background:var(--danger);color:white;border-radius:10px;font-size:9px;padding:1px 5px;margin-left:auto;font-weight:700';
       el.appendChild(badge);
     }
   });
 }
+
+function dispensarAlerta(index, event) {
+  event.stopPropagation();
+  if (!window._alertasDismissed) window._alertasDismissed = new Set();
+  window._alertasDismissed.add(index);
+
+  const item = document.getElementById('alerta-item-' + index);
+  if (item) {
+    item.style.transition = 'opacity 0.2s';
+    item.style.opacity = '0';
+    setTimeout(() => {
+      item.remove();
+      // Esconde o banner se não restar nenhum aviso visível
+      const banner = document.getElementById('alertas-banner');
+      if (banner && !banner.querySelector('[id^="alerta-item-"]')) {
+        banner.style.display = 'none';
+      }
+      // Atualiza badge do nav
+      document.querySelectorAll('.alert-badge').forEach(b => {
+        const atual = parseInt(b.textContent) - 1;
+        if (atual <= 0) b.remove();
+        else b.textContent = atual;
+      });
+    }, 200);
+  }
+}
+
+window.dispensarAlerta = dispensarAlerta;
 
 // ── RENDERIZA CONFIGURAÇÕES ───────────────────────────────────
 async function renderConfig() {
