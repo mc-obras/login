@@ -123,16 +123,21 @@ function calcSaldoObra(obra, planilhas, lancamentos) {
 const empresaCol = sub => db.collection(`empresas/${App.empresaId}/${sub}`);
 
 async function getAll(colName, orderField = 'created_at') {
-  try {
-    if (!orderField) {
-      const snap = await empresaCol(colName).get();
+  // Tenta com orderBy; se falhar (indice ausente), busca sem ordenacao
+  if (orderField) {
+    try {
+      const snap = await empresaCol(colName).orderBy(orderField, 'desc').get();
       return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) {
+      console.warn('[getAll] orderBy falhou em "' + colName + '", buscando sem ordenacao:', e.message);
     }
-    const snap = await empresaCol(colName).orderBy(orderField, 'desc').get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch(e) {
+  }
+  try {
     const snap = await empresaCol(colName).get();
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(e) {
+    console.error('[getAll] Falha total em "' + colName + '":', e.message);
+    return [];
   }
 }
 
@@ -160,7 +165,7 @@ async function deleteDoc2(colName, id) {
 async function loadAll() {
   let [obras, planilhas, funcionarios, lancamentos, ordens_compra, alocacoes] = await Promise.all([
     getAll('obras'), getAll('planilhas'), getAll('funcionarios'),
-    getAll('lancamentos'), getAll('ordens_compra', null), getAll('alocacoes', 'data_inicio'),
+    getAll('lancamentos'), getAll('ordens_compra', null), getAll('alocacoes', null),
   ]);
 
   // Encarregado só vê suas obras atribuídas
