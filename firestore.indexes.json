@@ -27,11 +27,44 @@
       ]
     },
     {
+      "collectionGroup": "lancamentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "origem_ref_id", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "ordens_compra",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "obra_id", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ordens_compra",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "numero_oc", "order": "ASCENDING" },
+        { "fieldPath": "obra_id", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "presencas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "funcionario_id", "order": "ASCENDING" },
+        { "fieldPath": "data", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "horas_extras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "funcionario_id", "order": "ASCENDING" },
+        { "fieldPath": "pago", "order": "ASCENDING" },
+        { "fieldPath": "data", "order": "ASCENDING" }
       ]
     },
     {
