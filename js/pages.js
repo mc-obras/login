@@ -541,7 +541,7 @@ async function renderPresenca() {
   try {
     const snap = await empresaCol('presencas').where('data', '>=', initDate).get();
     presencas = snap.docs.map(d=>({id:d.id,...d.data()}));
-  } catch(e) {}
+  } catch(e) { console.warn('[presencas]', e.message); presencas = []; }
 
   const ativos = funcionarios.filter(f=>f.ativo);
 
@@ -1558,7 +1558,7 @@ async function renderHorasExtras() {
     const snap = await empresaCol('horas_extras')
       .where('data','>=',inicioMes).get();
     registros = snap.docs.map(d=>({id:d.id,...d.data()}));
-  } catch(e) {}
+  } catch(e) { console.warn('[horas_extras]', e.message); registros = []; }
 
   const ativos = funcionarios.filter(f=>f.ativo);
 
