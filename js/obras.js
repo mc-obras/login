@@ -467,8 +467,14 @@ async function cancelarOC(ocId, obraId) {
   App.loading(true);
   try {
     await updateDoc2('ordens_compra',ocId,{status:'cancelada'});
-    const snap=await empresaCol('lancamentos').where('origem_ref_id','==',ocId).where('status','==','ativo').get();
-    for(const d of snap.docs) await estornarLancamento(d.id);
+    let lancSnap;
+    try {
+      lancSnap = await empresaCol('lancamentos').where('origem_ref_id','==',ocId).where('status','==','ativo').get();
+    } catch(e) {
+      const allLanc = await empresaCol('lancamentos').get();
+      lancSnap = { docs: allLanc.docs.filter(d => d.data().origem_ref_id === ocId && d.data().status === 'ativo') };
+    }
+    for(const d of lancSnap.docs) await estornarLancamento(d.id);
     App.toast('OC cancelada!'); App.navigate('obra_detail',{id:obraId});
   } catch(e){App.toast('Erro: '+e.message,'error');}
   finally{App.loading(false);}
