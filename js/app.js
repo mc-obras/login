@@ -164,8 +164,8 @@ async function deleteDoc2(colName, id) {
 
 async function loadAll() {
   let [obras, planilhas, funcionarios, lancamentos, ordens_compra, alocacoes] = await Promise.all([
-    getAll('obras'), getAll('planilhas'), getAll('funcionarios'),
-    getAll('lancamentos'), getAll('ordens_compra', null), getAll('alocacoes', null),
+    getAll('obras', null), getAll('planilhas', null), getAll('funcionarios', null),
+    getAll('lancamentos', null), getAll('ordens_compra', null), getAll('alocacoes', null),
   ]);
 
   // Encarregado só vê suas obras atribuídas
