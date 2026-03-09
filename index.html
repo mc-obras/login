@@ -269,17 +269,22 @@
     const origNavigate = window.App ? App.navigate.bind(App) : null;
 
     // Observa mudança de página para marcar "Mais" como ativo se necessário
-    const observer = new MutationObserver(() => {
-      const activePage = document.querySelector('.bottom-nav-item.active[data-page]');
-      const maisBtns   = document.querySelectorAll('.bni-mais');
+    // Marca botão "Mais" como ativo quando a página atual pertence ao drawer
+    function atualizarMaisAtivo() {
+      const maisBtns = document.querySelectorAll('.bni-mais');
       const activeInDrawer = drawerPages.some(p =>
         document.querySelector(`.mais-item[data-page="${p}"].active`)
       );
       maisBtns.forEach(b => {
-        if (activeInDrawer) b.classList.add('active');
+        b.classList.toggle('active', activeInDrawer);
       });
-    });
-    observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    }
+    // Executa na navegação via hook no App.navigate
+    const _origNavigate = App.navigate.bind(App);
+    App.navigate = function(page, params) {
+      _origNavigate(page, params);
+      setTimeout(atualizarMaisAtivo, 50);
+    };
   });
 </script>
 
