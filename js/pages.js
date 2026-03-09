@@ -440,10 +440,16 @@ async function showHistoricoPagamentos(funcId) {
 
   App.loading(true);
   try {
-    const snap = await empresaCol('lancamentos')
-      .where('origem','==','funcionarios')
-      .where('status','==','ativo')
-      .get();
+    let snap;
+    try {
+      snap = await empresaCol('lancamentos')
+        .where('origem','==','funcionarios')
+        .where('status','==','ativo')
+        .get();
+    } catch(e) {
+      const allL = await empresaCol('lancamentos').get();
+      snap = { docs: allL.docs.filter(d => d.data().origem === 'funcionarios' && d.data().status === 'ativo') };
+    }
 
     const pagamentos = snap.docs
       .map(d=>({id:d.id,...d.data()}))
@@ -539,8 +545,8 @@ async function renderPresenca() {
   const initDate = diasSemana[0];
   let presencas = [];
   try {
-    const snap = await empresaCol('presencas').where('data', '>=', initDate).get();
-    presencas = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const snapP = await empresaCol('presencas').get();
+    presencas = snapP.docs.map(d=>({id:d.id,...d.data()})).filter(p => p.data >= initDate);
   } catch(e) { console.warn('[presencas]', e.message); presencas = []; }
 
   const ativos = funcionarios.filter(f=>f.ativo);
@@ -661,7 +667,11 @@ async function togglePresenca(funcId, data, btn) {
   try {
     snap = await empresaCol('presencas')
       .where('funcionario_id','==',funcId).where('data','==',data).get();
-  } catch(e) {}
+  } catch(e) {
+    const allP = await empresaCol('presencas').get();
+    const filtered = allP.docs.filter(d => d.data().funcionario_id === funcId && d.data().data === data);
+    snap = { docs: filtered };
+  }
 
   const atual = snap?.docs[0];
   const statusAtual = atual?.data()?.status || null;
@@ -1113,8 +1123,14 @@ async function carregarPlanilhasOI() {
   const sel    = document.getElementById('oi-plan');
   if (!sel) return;
   if (!obraId) { sel.innerHTML='<option value="">— Selecione a obra primeiro —</option>'; return; }
-  const snap = await empresaCol('planilhas').where('obra_id','==',obraId).get();
-  const pls  = snap.docs.map(d=>({id:d.id,...d.data()}));
+  let plSnap;
+  try {
+    plSnap = await empresaCol('planilhas').where('obra_id','==',obraId).get();
+  } catch(e) {
+    const allPl = await empresaCol('planilhas').get();
+    plSnap = { docs: allPl.docs.filter(d => d.data().obra_id === obraId) };
+  }
+  const pls  = plSnap.docs.map(d=>({id:d.id,...d.data()}));
   sel.innerHTML = pls.length===0
     ? '<option value="">Sem planilhas nesta obra</option>'
     : '<option value="">— Selecione —</option>'+pls.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
@@ -1193,8 +1209,15 @@ async function confirmarImportacaoOC() {
 
   App.loading(true);
   try {
-    const dup = await empresaCol('ordens_compra')
-      .where('numero_oc','==',num).where('obra_id','==',obraId).get();
+    let dup;
+    try {
+      const dupSnap = await empresaCol('ordens_compra')
+        .where('numero_oc','==',num).where('obra_id','==',obraId).get();
+      dup = dupSnap;
+    } catch(e) {
+      const all = await empresaCol('ordens_compra').get();
+      dup = { docs: all.docs.filter(d => d.data().numero_oc === num && d.data().obra_id === obraId) };
+    }
 
     if (!dup.empty) {
       App.loading(false);
@@ -1222,10 +1245,23 @@ async function forcarImportacaoOC(num,acao,forn,cnpj,valor,data,obraId,planId) {
   closeModal();
   App.loading(true);
   try {
-    const dup = await empresaCol('ordens_compra').where('numero_oc','==',num).where('obra_id','==',obraId).get();
+    let dupOC;
+    try {
+      dupOC = await empresaCol('ordens_compra').where('numero_oc','==',num).where('obra_id','==',obraId).get();
+    } catch(e) {
+      const allOC = await empresaCol('ordens_compra').get();
+      dupOC = { docs: allOC.docs.filter(d => d.data().numero_oc === num && d.data().obra_id === obraId) };
+    }
+    const dup = dupOC;
     for (const d of dup.docs) {
       await updateDoc2('ordens_compra', d.id, { status: 'cancelada' });
-      const ls = await empresaCol('lancamentos').where('origem_ref_id','==',d.id).where('status','==','ativo').get();
+      let ls;
+      try {
+        ls = await empresaCol('lancamentos').where('origem_ref_id','==',d.id).where('status','==','ativo').get();
+      } catch(e) {
+        const allL = await empresaCol('lancamentos').get();
+        ls = { docs: allL.docs.filter(doc => doc.data().origem_ref_id === d.id && doc.data().status === 'ativo') };
+      }
       for (const l of ls.docs) await estornarLancamento(l.id);
     }
     await gravarOC(num,acao,forn,cnpj,parseFloat(valor),data,obraId,planId);
@@ -1500,8 +1536,14 @@ async function carregarPlanilhasNL() {
   const sel    = document.getElementById('nl-planilha');
   if (!sel) return;
   if (!obraId) { sel.innerHTML='<option value="">Direto na obra</option>'; return; }
-  const snap = await empresaCol('planilhas').where('obra_id','==',obraId).get();
-  const pls  = snap.docs.map(d=>({id:d.id,...d.data()}));
+  let plSnap2;
+  try {
+    plSnap2 = await empresaCol('planilhas').where('obra_id','==',obraId).get();
+  } catch(e) {
+    const allPl2 = await empresaCol('planilhas').get();
+    plSnap2 = { docs: allPl2.docs.filter(d => d.data().obra_id === obraId) };
+  }
+  const pls  = plSnap2.docs.map(d=>({id:d.id,...d.data()}));
   sel.innerHTML = '<option value="">Direto na obra (sem planilha específica)</option>'
     + pls.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
 }
@@ -1555,9 +1597,8 @@ async function renderHorasExtras() {
   // Busca registros de horas extras do mês atual
   let registros = [];
   try {
-    const snap = await empresaCol('horas_extras')
-      .where('data','>=',inicioMes).get();
-    registros = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const snapHE = await empresaCol('horas_extras').get();
+    registros = snapHE.docs.map(d=>({id:d.id,...d.data()})).filter(r => r.data >= inicioMes);
   } catch(e) { console.warn('[horas_extras]', e.message); registros = []; }
 
   const ativos = funcionarios.filter(f=>f.ativo);
@@ -1795,12 +1836,9 @@ async function pagarHorasExtras(funcId) {
 
   // Busca registros não pagos do mês
   const inicioMes = today().substring(0,7)+'-01';
-  const snap = await empresaCol('horas_extras')
-    .where('funcionario_id','==',funcId)
-    .where('pago','==',false)
-    .where('data','>=',inicioMes).get();
-
-  const pendentes = snap.docs.map(d=>({id:d.id,...d.data()}));
+  const snapHE2 = await empresaCol('horas_extras').get();
+  const pendentes = snapHE2.docs.map(d=>({id:d.id,...d.data()}))
+    .filter(r => r.funcionario_id === funcId && r.pago === false && r.data >= inicioMes);
   const totalHoras = pendentes.reduce((s,r)=>s+(r.horas||0),0);
   const totalValor = pendentes.reduce((s,r)=>s+(r.valor_calculado||0),0);
 
