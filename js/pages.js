@@ -1440,18 +1440,18 @@ function renderLancList(lancs, obras, planilhas) {
       </div>
       <div class="lanc-right">
         <div class="lanc-value ${l.tipo}">${l.tipo==='despesa'?'-':'+'}${fmt(l.valor)}</div>
-        <button class="btn-link danger" onclick="estornarLancUI('${l.id}')">estornar</button>
+        <button class="btn-link danger" onclick="excluirLancUI('${l.id}')">excluir</button>
       </div>
     </div>`;
   }).join('');
 }
 
-async function estornarLancUI(lancId) {
-  if (!confirm('Estornar este lançamento? O valor será devolvido ao saldo.')) return;
+async function excluirLancUI(lancId) {
+  if (!confirm('Excluir este lançamento? O valor será devolvido automaticamente ao saldo.')) return;
   App.loading(true);
   try {
-    await estornarLancamento(lancId);
-    App.toast('Lançamento estornado!');
+    await deleteDoc2('lancamentos', lancId);
+    App.toast('Lançamento excluído! Valor devolvido ao saldo.');
     App.navigate('lancamentos');
   } catch(e) { App.toast('Erro: '+e.message,'error'); }
   finally { App.loading(false); }
@@ -1950,7 +1950,7 @@ window.forcarImportacaoOC    = forcarImportacaoOC;
 window.cancelarOCGlobal      = cancelarOCGlobal;
 window.filtrarLancs          = filtrarLancs;
 window.filtrarPeriodo        = filtrarPeriodo;
-window.estornarLancUI        = estornarLancUI;
+window.excluirLancUI         = excluirLancUI;
 window.showNovoLancamento    = showNovoLancamento;
 window.setTipoLanc           = setTipoLanc;
 window.carregarPlanilhasNL   = carregarPlanilhasNL;
