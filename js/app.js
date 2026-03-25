@@ -9,7 +9,7 @@
 // visualizador→ dashboard, obras (todas, só leitura), planilhas (só leitura)
 
 const PERFIL_TELAS = {
-  admin:        ['dashboard','obras','obra_detail','planilhas','funcionarios','presenca','horas_extras','ordens_compra','lancamentos','configuracoes'],
+  admin:        ['dashboard','obras','obra_detail','planilhas','funcionarios','presenca','horas_extras','ordens_compra','lancamentos','relatorios','configuracoes'],
   encarregado:  ['obras','obra_detail','funcionarios','presenca','horas_extras','lancamentos'],
   visualizador: ['dashboard','obras','obra_detail','planilhas'],
 };
@@ -22,7 +22,7 @@ const PERFIL_HOME = {
 
 // Menus da sidebar visíveis por perfil
 const PERFIL_NAV = {
-  admin:        ['dashboard','obras','planilhas','funcionarios','presenca','horas_extras','ordens_compra','lancamentos','configuracoes'],
+  admin:        ['dashboard','obras','planilhas','funcionarios','presenca','horas_extras','ordens_compra','lancamentos','relatorios','configuracoes'],
   encarregado:  ['obras','funcionarios','presenca','horas_extras','lancamentos'],
   visualizador: ['dashboard','obras','planilhas'],
 };
@@ -342,6 +342,7 @@ function renderPage(page, params = {}) {
     ordens_compra: renderOC,
     lancamentos:   renderLancamentos,
     configuracoes: renderConfig,
+    relatorios:    renderRelatorios,
   };
 
   const fn = map[page];
