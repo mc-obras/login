@@ -797,6 +797,10 @@ async function renderOC() {
   const ativas    = ordens_compra.filter(o=>o.status==='ativa');
   const canceladas= ordens_compra.filter(o=>o.status==='cancelada');
 
+  const hoje      = new Date();
+  const inicioMes = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-01`;
+  const hojeStr   = hoje.toISOString().split('T')[0];
+
   main.innerHTML = `
   <div class="page">
     <div class="page-header">
@@ -818,22 +822,103 @@ async function renderOC() {
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:14px">
-      <div class="card-header"><span class="card-title-lg">OCs Ativas</span></div>
-      <div class="card-body">
-        ${ativas.length===0 ? '<div class="empty">Nenhuma OC ativa</div>' :
-          ativas.map(oc=>ocRow(oc,obras,planilhas,true)).join('')}
+    <!-- Filtros -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body" style="padding:14px">
+        <div class="filter-row" style="flex-wrap:wrap;gap:8px">
+          <select id="oc-fl-obra" class="form-input" style="flex:1;min-width:140px" onchange="filtrarOCs()">
+            <option value="">Todas as obras</option>
+            ${obras.map(o=>`<option value="${o.id}">${o.nome}</option>`).join('')}
+          </select>
+          <select id="oc-fl-status" class="form-input" style="flex:1;min-width:120px" onchange="filtrarOCs()">
+            <option value="">Todos os status</option>
+            <option value="ativa">Ativas</option>
+            <option value="cancelada">Canceladas</option>
+          </select>
+        </div>
+        <div class="filter-row" style="flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center">
+          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:200px">
+            <label style="font-size:12px;color:var(--text2);white-space:nowrap">De:</label>
+            <input id="oc-fl-ini" class="form-input" type="date" value="${inicioMes}" onchange="filtrarOCs()" style="flex:1">
+            <label style="font-size:12px;color:var(--text2);white-space:nowrap">Até:</label>
+            <input id="oc-fl-fim" class="form-input" type="date" value="${hojeStr}" onchange="filtrarOCs()" style="flex:1">
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="filtrarOCsPeriodo('mes')">Este mês</button>
+            <button class="btn btn-secondary btn-sm" onclick="filtrarOCsPeriodo('trimestre')">Trimestre</button>
+            <button class="btn btn-secondary btn-sm" onclick="filtrarOCsPeriodo('tudo')">Tudo</button>
+          </div>
+        </div>
+        <div id="oc-fl-resumo" style="font-size:11px;color:var(--text3);margin-top:8px;text-align:right"></div>
       </div>
     </div>
 
-    ${canceladas.length>0 ? `
-    <div class="card">
-      <div class="card-header"><span class="card-title-lg">OCs Canceladas</span></div>
-      <div class="card-body">
-        ${canceladas.map(oc=>ocRow(oc,obras,planilhas,false)).join('')}
-      </div>
-    </div>` : ''}
+    <div id="oc-container"></div>
   </div>`;
+
+  window._ocData = { ordens_compra, obras, planilhas };
+  filtrarOCs();
+}
+
+function filtrarOCsPeriodo(tipo) {
+  const hoje = new Date();
+  let ini, fim = hoje.toISOString().split('T')[0];
+  if (tipo === 'mes') {
+    ini = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-01`;
+  } else if (tipo === 'trimestre') {
+    const d = new Date(hoje); d.setMonth(d.getMonth()-3);
+    ini = d.toISOString().split('T')[0];
+  } else {
+    ini = '2020-01-01';
+  }
+  document.getElementById('oc-fl-ini').value = ini;
+  document.getElementById('oc-fl-fim').value = fim;
+  filtrarOCs();
+}
+
+function filtrarOCs() {
+  const obraF   = document.getElementById('oc-fl-obra')?.value;
+  const statusF = document.getElementById('oc-fl-status')?.value;
+  const dataIni = document.getElementById('oc-fl-ini')?.value;
+  const dataFim = document.getElementById('oc-fl-fim')?.value;
+  const { ordens_compra, obras, planilhas } = window._ocData;
+
+  const filtradas = ordens_compra.filter(oc => {
+    if (obraF   && oc.obra_id !== obraF)   return false;
+    if (statusF && oc.status  !== statusF)  return false;
+    if ((dataIni || dataFim) && oc.data_emissao) {
+      if (dataIni && oc.data_emissao < dataIni) return false;
+      if (dataFim && oc.data_emissao > dataFim) return false;
+    }
+    return true;
+  });
+
+  const fAtivas    = filtradas.filter(oc=>oc.status==='ativa');
+  const fCanceladas= filtradas.filter(oc=>oc.status==='cancelada');
+  const totalFilt  = fAtivas.reduce((s,oc)=>s+(oc.valor_total||0),0);
+
+  const resumoEl = document.getElementById('oc-fl-resumo');
+  if (resumoEl) resumoEl.innerHTML =
+    `${filtradas.length} OC${filtradas.length!==1?'s':''} · <strong style="color:var(--blue-600)">${fmt(totalFilt)}</strong> comprometidos`;
+
+  const container = document.getElementById('oc-container');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header"><span class="card-title-lg">OCs Ativas (${fAtivas.length})</span></div>
+      <div class="card-body">
+        ${fAtivas.length===0 ? '<div class="empty">Nenhuma OC encontrada</div>' :
+          fAtivas.map(oc=>ocRow(oc,obras,planilhas,true)).join('')}
+      </div>
+    </div>
+    ${fCanceladas.length>0 ? `
+    <div class="card">
+      <div class="card-header"><span class="card-title-lg">OCs Canceladas (${fCanceladas.length})</span></div>
+      <div class="card-body">
+        ${fCanceladas.map(oc=>ocRow(oc,obras,planilhas,false)).join('')}
+      </div>
+    </div>` : ''}`;
 }
 
 function ocRow(oc, obras, planilhas, canCancel) {
@@ -854,11 +939,142 @@ function ocRow(oc, obras, planilhas, canCancel) {
       <div style="display:flex;align-items:center;gap:10px">
         <span class="oc-value">${fmt(oc.valor_total)}</span>
         ${canCancel
-          ? `<button class="btn btn-danger btn-sm" onclick="cancelarOCGlobal('${oc.id}')">Cancelar</button>`
+          ? `<button class="btn btn-secondary btn-sm" onclick="showEditarOC('${oc.id}')">✏️ Editar</button>
+             <button class="btn btn-danger btn-sm" onclick="cancelarOCGlobal('${oc.id}')">Cancelar</button>`
           : `<span class="badge cancelada">cancelada</span>`}
       </div>
     </div>
   </div>`;
+}
+
+async function showEditarOC(ocId) {
+  const { obras, planilhas } = await loadAll();
+  let snap;
+  try {
+    snap = await empresaCol('ordens_compra').doc(ocId).get();
+  } catch(e) {
+    return App.toast('Erro ao carregar OC: '+e.message, 'error');
+  }
+  const oc = {id: snap.id, ...snap.data()};
+  const obraPlans = planilhas.filter(p => p.obra_id === oc.obra_id);
+
+  showModal({
+    title: `Editar OC ${oc.numero_oc||'—'}`,
+    body: `
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nº OC *</label>
+          <input id="eoc-num" class="form-input" value="${oc.numero_oc||''}" style="font-family:'JetBrains Mono',monospace">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nº Ação</label>
+          <input id="eoc-acao" class="form-input" value="${oc.numero_acao||''}" style="font-family:'JetBrains Mono',monospace">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fornecedor *</label>
+        <input id="eoc-forn" class="form-input" value="${oc.fornecedor||''}">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">CNPJ Fornecedor</label>
+          <input id="eoc-cnpj" class="form-input" value="${oc.cnpj_fornecedor||''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valor Total (R$) *</label>
+          <input id="eoc-valor" class="form-input" type="number" step="0.01" value="${oc.valor_total||''}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data de Emissão</label>
+        <input id="eoc-data" class="form-input" type="date" value="${oc.data_emissao||''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Obra</label>
+        <select id="eoc-obra" class="form-input" onchange="carregarPlanilhasEOC('${ocId}')">
+          <option value="">— Selecione —</option>
+          ${obras.filter(o=>o.status==='ativa').map(o=>`<option value="${o.id}" ${o.id===oc.obra_id?'selected':''}>${o.nome}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Planilha</label>
+        <select id="eoc-plan" class="form-input">
+          ${obraPlans.length===0
+            ? '<option value="">— Sem planilhas nesta obra —</option>'
+            : '<option value="">— Sem planilha específica —</option>'+obraPlans.map(p=>`<option value="${p.id}" ${p.id===oc.planilha_id?'selected':''}>${p.nome}</option>`).join('')}
+        </select>
+      </div>
+      <div class="alert info no-click" style="margin-top:8px"><span class="alert-icon">ℹ</span><span>Se o valor for alterado, o lançamento original será ajustado automaticamente.</span></div>`,
+    footer: `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarEdicaoOC('${ocId}',${oc.valor_total})">✓ Salvar Alterações</button>`
+  });
+}
+
+async function carregarPlanilhasEOC(ocId) {
+  const obraId = document.getElementById('eoc-obra')?.value;
+  const sel = document.getElementById('eoc-plan');
+  if (!sel) return;
+  if (!obraId) { sel.innerHTML='<option value="">— Selecione a obra primeiro —</option>'; return; }
+  let snap;
+  try {
+    snap = await empresaCol('planilhas').where('obra_id','==',obraId).get();
+  } catch(e) {
+    const all = await empresaCol('planilhas').get();
+    snap = { docs: all.docs.filter(d=>d.data().obra_id===obraId) };
+  }
+  const pls = snap.docs.map(d=>({id:d.id,...d.data()}));
+  sel.innerHTML = '<option value="">— Sem planilha específica —</option>'
+    + pls.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
+}
+
+async function salvarEdicaoOC(ocId, valorOriginal) {
+  const num   = document.getElementById('eoc-num')?.value.trim();
+  const acao  = document.getElementById('eoc-acao')?.value.trim();
+  const forn  = document.getElementById('eoc-forn')?.value.trim();
+  const cnpj  = document.getElementById('eoc-cnpj')?.value.trim();
+  const valor = parseFloat(document.getElementById('eoc-valor')?.value)||0;
+  const data  = document.getElementById('eoc-data')?.value;
+  const obraId= document.getElementById('eoc-obra')?.value;
+  const planId= document.getElementById('eoc-plan')?.value;
+
+  if (!num)    return App.toast('Informe o número da OC','error');
+  if (!forn)   return App.toast('Informe o fornecedor','error');
+  if (!obraId) return App.toast('Selecione a obra','error');
+  if (!valor)  return App.toast('Informe o valor','error');
+
+  App.loading(true);
+  try {
+    // Atualiza a OC
+    await updateDoc2('ordens_compra', ocId, {
+      numero_oc: num, numero_acao: acao, fornecedor: forn,
+      cnpj_fornecedor: cnpj, valor_total: valor,
+      data_emissao: data, obra_id: obraId, planilha_id: planId||null
+    });
+
+    // Se o valor mudou, ajusta o lançamento vinculado
+    if (valor !== valorOriginal) {
+      let lancSnap;
+      try {
+        lancSnap = await empresaCol('lancamentos')
+          .where('origem_ref_id','==',ocId).where('status','==','ativo').get();
+      } catch(e) {
+        const all = await empresaCol('lancamentos').get();
+        lancSnap = { docs: all.docs.filter(d=>d.data().origem_ref_id===ocId&&d.data().status==='ativo') };
+      }
+      for (const d of lancSnap.docs) {
+        await updateDoc2('lancamentos', d.id, {
+          valor, obra_id: obraId, planilha_id: planId||null,
+          descricao: `OC ${num} — ${forn}`
+        });
+      }
+    }
+
+    closeModal();
+    App.toast(`OC ${num} atualizada!`);
+    App.navigate('ordens_compra');
+  } catch(e) { App.toast('Erro: '+e.message,'error'); }
+  finally { App.loading(false); }
 }
 
 async function cancelarOCGlobal(ocId) {
@@ -1446,13 +1662,17 @@ function renderLancList(lancs, obras, planilhas) {
   }).join('');
 }
 
-async function excluirLancUI(lancId) {
+async function excluirLancUI(lancId, obraId = '') {
   if (!confirm('Excluir este lançamento? O valor será devolvido automaticamente ao saldo.')) return;
   App.loading(true);
   try {
     await deleteDoc2('lancamentos', lancId);
     App.toast('Lançamento excluído! Valor devolvido ao saldo.');
-    App.navigate('lancamentos');
+    if (obraId) {
+      App.navigate('obra_detail', {id: obraId});
+    } else {
+      App.navigate('lancamentos');
+    }
   } catch(e) { App.toast('Erro: '+e.message,'error'); }
   finally { App.loading(false); }
 }
@@ -1472,6 +1692,7 @@ async function showNovoLancamento(obraIdPre = '') {
         </div>
         <div id="tipo-hint" class="form-hint" style="color:var(--danger)">Saída de dinheiro da obra</div>
         <input type="hidden" id="nl-tipo" value="despesa">
+        <input type="hidden" id="nl-obra-pre" value="${obraIdPre}">
       </div>
       <div class="form-group">
         <label class="form-label">Obra *</label>
@@ -1578,7 +1799,12 @@ async function confirmarNovoLanc() {
     });
     closeModal();
     App.toast('Lançamento salvo!');
-    App.navigate('lancamentos');
+    const obraPreId = document.getElementById('nl-obra-pre')?.value;
+    if (obraPreId) {
+      App.navigate('obra_detail', {id: obraPreId});
+    } else {
+      App.navigate('lancamentos');
+    }
   } catch(e) { App.toast('Erro: '+e.message,'error'); }
   finally { App.loading(false); }
 }
@@ -1947,6 +2173,11 @@ window.carregarPlanilhasOI   = carregarPlanilhasOI;
 window.mostrarFormOCManual   = mostrarFormOCManual;
 window.confirmarImportacaoOC = confirmarImportacaoOC;
 window.forcarImportacaoOC    = forcarImportacaoOC;
+window.showEditarOC           = showEditarOC;
+window.carregarPlanilhasEOC  = carregarPlanilhasEOC;
+window.salvarEdicaoOC        = salvarEdicaoOC;
+window.filtrarOCs            = filtrarOCs;
+window.filtrarOCsPeriodo     = filtrarOCsPeriodo;
 window.cancelarOCGlobal      = cancelarOCGlobal;
 window.filtrarLancs          = filtrarLancs;
 window.filtrarPeriodo        = filtrarPeriodo;
@@ -1964,3 +2195,209 @@ window.salvarHoraExtra         = salvarHoraExtra;
 window.pagarHorasExtras        = pagarHorasExtras;
 window.confirmarPagamentoHE    = confirmarPagamentoHE;
 window.excluirHoraExtra        = excluirHoraExtra;
+
+
+// ── RELATÓRIOS ────────────────────────────────────────────────
+async function renderRelatorios() {
+  const { obras, planilhas, lancamentos, ordens_compra } = await loadAll();
+  const main = document.getElementById('main-content');
+
+  const ativos = lancamentos.filter(l => l.status === 'ativo');
+
+  // ── Resumo financeiro por obra
+  const resumoObras = obras.map(o => {
+    const obraLancs = ativos.filter(l => l.obra_id === o.id);
+    const desp  = obraLancs.filter(l => l.tipo === 'despesa').reduce((s,l) => s+(l.valor||0), 0);
+    const rec   = obraLancs.filter(l => l.tipo === 'receita').reduce((s,l) => s+(l.valor||0), 0);
+    const base  = (o.saldo_inicial||0) + planilhas.filter(p=>p.obra_id===o.id).reduce((s,p)=>s+(p.saldo_inicial||0),0);
+    const saldo = base - desp + rec;
+    const pct   = base > 0 ? Math.max(0, Math.min(100, (saldo/base)*100)) : 0;
+    return { obra: o, desp, rec, base, saldo, pct, nLancs: obraLancs.length };
+  }).sort((a,b) => b.desp - a.desp);
+
+  // ── Top fornecedores (por OCs ativas)
+  const fornMap = {};
+  ordens_compra.filter(oc=>oc.status==='ativa').forEach(oc => {
+    const key = oc.fornecedor || 'Sem fornecedor';
+    if (!fornMap[key]) fornMap[key] = { total: 0, count: 0 };
+    fornMap[key].total += (oc.valor_total||0);
+    fornMap[key].count++;
+  });
+  const topForn = Object.entries(fornMap).sort((a,b)=>b[1].total-a[1].total).slice(0,8);
+
+  // ── Gastos por categoria
+  const catMap = {};
+  ativos.filter(l=>l.tipo==='despesa').forEach(l => {
+    const c = l.categoria || 'Outros';
+    catMap[c] = (catMap[c]||0) + (l.valor||0);
+  });
+  const topCat = Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+  const totalCat = topCat.reduce((s,[,v])=>s+v,0);
+
+  // ── Evolução mensal (últimos 6 meses)
+  const hoje = new Date();
+  const meses = [];
+  for (let i=5; i>=0; i--) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth()-i, 1);
+    meses.push({ ano: d.getFullYear(), mes: d.getMonth()+1,
+      label: d.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}) });
+  }
+  const evolucao = meses.map(m => {
+    const despM = ativos.filter(l=>l.tipo==='despesa').reduce((s,l) => {
+      const d = l.created_at?.toDate?.();
+      if (!d) return s;
+      return (d.getMonth()+1===m.mes && d.getFullYear()===m.ano) ? s+(l.valor||0) : s;
+    }, 0);
+    const recM = ativos.filter(l=>l.tipo==='receita').reduce((s,l) => {
+      const d = l.created_at?.toDate?.();
+      if (!d) return s;
+      return (d.getMonth()+1===m.mes && d.getFullYear()===m.ano) ? s+(l.valor||0) : s;
+    }, 0);
+    return { ...m, desp: despM, rec: recM };
+  });
+  const maxEv = Math.max(...evolucao.map(e=>Math.max(e.desp,e.rec)), 1);
+
+  // ── Totais gerais
+  const totalDesp = ativos.filter(l=>l.tipo==='despesa').reduce((s,l)=>s+(l.valor||0),0);
+  const totalRec  = ativos.filter(l=>l.tipo==='receita').reduce((s,l)=>s+(l.valor||0),0);
+  const totalBase = obras.reduce((s,o)=>{
+    return s+(o.saldo_inicial||0)+planilhas.filter(p=>p.obra_id===o.id).reduce((ss,p)=>ss+(p.saldo_inicial||0),0);
+  },0);
+
+  main.innerHTML = `
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title"><div class="page-title-icon">📈</div>Relatórios</h1>
+      <div class="page-actions">
+        <button class="btn btn-secondary" onclick="exportarRelatorioCSV()">⬇ Exportar CSV</button>
+      </div>
+    </div>
+
+    <!-- KPIs gerais -->
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+      <div class="stat-card">
+        <div class="stat-card-inner"><div><div class="stat-label">Total Despesas</div><div class="stat-value sm red">${fmt(totalDesp)}</div></div><div class="stat-icon red">📉</div></div>
+        <div class="stat-label">${ativos.filter(l=>l.tipo==='despesa').length} lançamentos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-inner"><div><div class="stat-label">Total Receitas</div><div class="stat-value sm green">${fmt(totalRec)}</div></div><div class="stat-icon green">📈</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-inner"><div><div class="stat-label">Saldo Geral</div><div class="stat-value sm ${totalRec-totalDesp>=0?'green':'red'}">${fmt(totalRec-totalDesp)}</div></div><div class="stat-icon blue">⚖️</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-inner"><div><div class="stat-label">Budget Total</div><div class="stat-value sm">${fmt(totalBase)}</div></div><div class="stat-icon blue">🏦</div></div>
+        <div class="stat-label">${totalBase>0?((totalDesp/totalBase)*100).toFixed(1)+'% utilizado':''}</div>
+      </div>
+    </div>
+
+    <!-- Evolução mensal -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><span class="card-title-lg">📅 Evolução Mensal (6 meses)</span></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;align-items:end;height:120px;margin-bottom:8px">
+          ${evolucao.map(m => `
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end">
+            <div style="font-size:10px;color:var(--danger);font-weight:700">${m.desp>0?fmt(m.desp).replace('R$',''):'—'}</div>
+            <div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:80px">
+              <div style="flex:1;background:var(--danger);opacity:.8;border-radius:3px 3px 0 0;height:${Math.max(4,(m.desp/maxEv)*80)}px" title="Despesas ${fmt(m.desp)}"></div>
+              <div style="flex:1;background:var(--success);opacity:.8;border-radius:3px 3px 0 0;height:${Math.max(m.rec>0?4:0,(m.rec/maxEv)*80)}px" title="Receitas ${fmt(m.rec)}"></div>
+            </div>
+          </div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+          ${evolucao.map(m=>`<div style="text-align:center;font-size:10px;color:var(--text3)">${m.label}</div>`).join('')}
+        </div>
+        <div style="display:flex;gap:16px;margin-top:10px;justify-content:center">
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px"><span style="width:12px;height:12px;background:var(--danger);opacity:.8;border-radius:2px;display:inline-block"></span>Despesas</span>
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px"><span style="width:12px;height:12px;background:var(--success);opacity:.8;border-radius:2px;display:inline-block"></span>Receitas</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <!-- Resumo por obra -->
+      <div class="card">
+        <div class="card-header"><span class="card-title-lg">🏗 Resumo por Obra</span></div>
+        <div class="card-body">
+          ${resumoObras.length===0 ? '<div class="empty">Nenhuma obra</div>' :
+            resumoObras.map(r => `
+            <div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="App.navigate('obra_detail',{id:'${r.obra.id}'})">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
+                <div>
+                  <div style="font-size:13px;font-weight:700">${r.obra.nome}</div>
+                  <div style="font-size:10px;color:var(--text3)">${r.nLancs} lançamentos · Budget: ${fmt(r.base)}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0">
+                  <div style="font-size:13px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--danger)">-${fmt(r.desp)}</div>
+                  <div style="font-size:10px;color:${r.saldo<0?'var(--danger)':'var(--success)'}">Saldo: ${fmt(r.saldo)}</div>
+                </div>
+              </div>
+              <div class="progress-wrap xs"><div class="progress-fill ${r.saldo<0?'danger':r.pct<25?'low':''}" style="width:${r.saldo<0?100:r.pct}%"></div></div>
+              <div style="font-size:10px;color:var(--text3);margin-top:2px">${r.pct.toFixed(1)}% disponível</div>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <!-- Top fornecedores -->
+      <div class="card">
+        <div class="card-header"><span class="card-title-lg">🏭 Top Fornecedores</span></div>
+        <div class="card-body">
+          ${topForn.length===0 ? '<div class="empty">Nenhuma OC ativa</div>' :
+            topForn.map(([nome, d], i) => `
+            <div class="cat-row" style="padding:8px 0;border-bottom:1px solid var(--border)">
+              <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+                <span style="font-size:12px;font-weight:800;color:var(--text3);width:18px">${i+1}</span>
+                <div style="min-width:0">
+                  <div class="cat-nome" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nome}</div>
+                  <div style="font-size:10px;color:var(--text3)">${d.count} OC${d.count!==1?'s':''}</div>
+                </div>
+              </div>
+              <div class="cat-val">${fmt(d.total)}</div>
+            </div>
+            <div class="progress-wrap xs" style="margin-bottom:4px"><div class="progress-fill" style="width:${((d.total/topForn[0][1].total)*100).toFixed(0)}%"></div></div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Gastos por categoria -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-header"><span class="card-title-lg">🏷 Gastos por Categoria</span></div>
+      <div class="card-body">
+        ${topCat.length===0 ? '<div class="empty">Nenhum dado</div>' :
+          `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+            ${topCat.map(([cat,val]) => `
+            <div style="padding:12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">
+              <div style="font-size:12px;color:var(--text2);margin-bottom:2px">${cat}</div>
+              <div style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--danger)">${fmt(val)}</div>
+              <div class="progress-wrap xs" style="margin-top:6px"><div class="progress-fill" style="width:${totalCat>0?((val/totalCat)*100).toFixed(0):0}%"></div></div>
+              <div style="font-size:10px;color:var(--text3);margin-top:2px">${totalCat>0?((val/totalCat)*100).toFixed(1):'0'}% do total</div>
+            </div>`).join('')}
+          </div>`}
+      </div>
+    </div>
+  </div>`;
+}
+
+function exportarRelatorioCSV() {
+  const obras    = App.cache.obras;
+  const planilhas = App.cache.planilhas;
+  const lancs    = App.cache.lancamentos.filter(l=>l.status==='ativo');
+
+  let csv = 'Obra,Categoria,Descrição,Tipo,Valor,Data\n';
+  lancs.sort((a,b)=>(b.created_at?.toDate?.()||0)-(a.created_at?.toDate?.()||0)).forEach(l => {
+    const obra = obras.find(o=>o.id===l.obra_id);
+    csv += `"${obra?.nome||'—'}","${l.categoria||''}","${l.descricao||''}","${l.tipo}","${(l.valor||0).toFixed(2)}","${fmtDate(l.created_at)}"\n`;
+  });
+
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='relatorio-financeiro.csv'; a.click();
+  URL.revokeObjectURL(url);
+  App.toast('Relatório exportado!');
+}
+
+window.renderRelatorios   = renderRelatorios;
+window.exportarRelatorioCSV = exportarRelatorioCSV;
