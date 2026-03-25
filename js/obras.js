@@ -252,7 +252,8 @@ async function renderObraDetail(params={}) {
                 <span class="tag">${pl?.nome||'Direto na obra'}</span>
                 <div style="display:flex;align-items:center;gap:8px">
                   <span class="oc-value">${fmt(oc.valor_total)}</span>
-                  ${isAdmin&&oc.status==='ativa'?`<button class="btn-link danger" onclick="cancelarOC('${oc.id}','${obra.id}')">Cancelar</button>`:''}
+                  ${isAdmin&&oc.status==='ativa'?`<button class="btn-link" onclick="showEditarOC('${oc.id}')">editar</button>
+                  <button class="btn-link danger" onclick="cancelarOC('${oc.id}','${obra.id}')">Cancelar</button>`:''}
                   ${oc.status==='cancelada'?`<span class="badge cancelada">cancelada</span>`:''}
                 </div>
               </div>
@@ -279,7 +280,7 @@ async function renderObraDetail(params={}) {
             </div>
             <div class="lanc-right">
               <div class="lanc-value ${l.tipo}">${l.tipo==='despesa'?'-':'+'}${fmt(l.valor)}</div>
-              ${isAdmin?`<button class="btn-link danger" onclick="estornarUI('${l.id}','${obra.id}')">estornar</button>`:''}
+              ${isAdmin?`<button class="btn-link danger" onclick="excluirLancUI('${l.id}','${obra.id}')">excluir</button>`:''}
             </div>
           </div>`;
         }).join('')}
