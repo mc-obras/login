@@ -1115,7 +1115,7 @@ async function processarArquivoOC(file) {
   if (!file) return;
   const dropEl = document.getElementById('oc-drop');
   if (!dropEl) return;
-  dropEl.innerHTML = '<div class="upload-icon">🔍</div><div class="upload-text">Extraindo texto...</div><div class="upload-sub">Aguarde alguns segundos</div>';
+  dropEl.innerHTML = '<div class="upload-icon">🔍</div><div class="upload-text">Lendo documento com IA...</div><div class="upload-sub">Aguarde alguns segundos</div>';
 
   try {
     const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
@@ -1126,47 +1126,91 @@ async function processarArquivoOC(file) {
       return;
     }
 
-    const OCR_KEY = window.OCRSPACE_API_KEY || 'helloworld';
+    // Converte para imagem PNG (via pdf.js se for PDF) e depois para base64
+    let imgFile = isPDF ? await pdfParaImagem(file) : await redimensionarImagem(file, 1800);
+    const base64 = await fileParaBase64(imgFile);
+    const mediaType = imgFile.type || 'image/png';
 
-    // Converte PDF para imagem antes de enviar (mais rápido que enviar PDF direto)
-    // Engine 1 = ~3-5s, Engine 2 = ~15-40s mas mais preciso
-    let fileEnvio = file;
-    if (isPDF) {
-      fileEnvio = await pdfParaImagem(file);
-    } else {
-      fileEnvio = await redimensionarImagem(file, 1800);
+    // Chama a API da Anthropic para extrair os dados da OC
+    const prompt = `Você é um extrator de dados de Ordens de Compra (OC) brasileiras.
+Analise a imagem desta OC e extraia EXATAMENTE os seguintes campos em JSON puro (sem markdown, sem explicações):
+{
+  "numero_oc": "número da OC (só dígitos, ex: 12977)",
+  "numero_acao": "número da obra/ação (ex: 1844)",
+  "nome_obra": "nome da obra conforme consta no documento",
+  "fornecedor": "nome do fornecedor/empresa",
+  "cnpj_fornecedor": "CNPJ no formato XX.XXX.XXX/XXXX-XX",
+  "data_emissao": "data no formato YYYY-MM-DD",
+  "valor_total": número decimal (ex: 7081.24)
+}
+Se um campo não existir no documento, coloque null. Retorne APENAS o JSON, sem texto adicional.`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+
+    if (!resp.ok) throw new Error(`API HTTP ${resp.status}`);
+    const apiData = await resp.json();
+    const textoResposta = (apiData.content || []).map(b => b.text || '').join('').trim();
+
+    console.log('[Claude OCR] Resposta bruta:', textoResposta);
+
+    // Parse do JSON retornado pelo Claude
+    let dados = {};
+    try {
+      const jsonLimpo = textoResposta.replace(/```json|```/g, '').trim();
+      dados = JSON.parse(jsonLimpo);
+    } catch(e) {
+      console.warn('[Claude OCR] JSON inválido, tentando parsearOC no texto:', textoResposta);
+      dados = parsearOC(textoResposta);
     }
 
-    const formData = new FormData();
-    formData.append('apikey',            OCR_KEY);
-    formData.append('language',          'por');
-    formData.append('isOverlayRequired', 'false');
-    formData.append('detectOrientation', 'true');
-    formData.append('scale',             'true');
-    formData.append('OCREngine',         '2');
-    formData.append('file', fileEnvio, 'oc.png');
+    // Normaliza data para YYYY-MM-DD se vier em outro formato
+    if (dados.data_emissao && dados.data_emissao.includes('/')) {
+      const [dd, mm, aaaa] = dados.data_emissao.split('/');
+      dados.data_emissao = `${aaaa}-${mm}-${dd}`;
+    }
 
-    const resp = await fetch('https://api.ocr.space/parse/image', { method: 'POST', body: formData });
-    if (!resp.ok) throw new Error(`OCR.space HTTP ${resp.status}`);
+    // Normaliza valor_total para número
+    if (typeof dados.valor_total === 'string') {
+      dados.valor_total = parseFloat(dados.valor_total.replace(/\./g,'').replace(',','.')) || null;
+    }
 
-    const data = await resp.json();
-    if (data.IsErroredOnProcessing) throw new Error(data.ErrorMessage?.[0] || 'Erro OCR');
+    // Remove nulls explícitos para não sobrescrever campos com null
+    Object.keys(dados).forEach(k => { if (dados[k] === null) delete dados[k]; });
 
-    const texto = (data.ParsedResults || []).map(p => p.ParsedText || '').join('\n').trim();
-    if (!texto || texto.length < 20) throw new Error('OCR não extraiu texto. Arquivo legível?');
-
-    console.log('[OCR] Texto bruto:\n', texto);
-    window._ocrTexto = texto;  // salva ANTES do parse
-    const dados = parsearOC(texto);
-    console.log('[OCR] Dados parseados:', dados);
+    console.log('[Claude OCR] Dados extraídos:', dados);
+    window._ocrTexto = textoResposta;
     await exibirPreviewOC(dados, file.name);
 
   } catch(err) {
-    console.error('Erro OCR:', err);
+    console.error('Erro na leitura da OC:', err);
     if (dropEl) dropEl.innerHTML = '<div class="upload-icon">🔍</div><div class="upload-text">Enviar PDF ou foto da OC</div><div class="upload-sub">PDF, JPG ou PNG</div>';
-    App.toast((err.message||'Erro na leitura') + ' — abrindo formulário manual', 'warning');
+    App.toast((err.message || 'Erro na leitura') + ' — abrindo formulário manual', 'warning');
     setTimeout(() => mostrarFormOCManual(''), 1500);
   }
+}
+
+// Converte File para base64 puro (sem o prefixo data:...)
+function fileParaBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 function redimensionarImagem(file, maxDim) {
