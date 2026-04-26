@@ -1115,7 +1115,7 @@ async function processarArquivoOC(file) {
   if (!file) return;
   const dropEl = document.getElementById('oc-drop');
   if (!dropEl) return;
-  dropEl.innerHTML = '<div class="upload-icon">🔍</div><div class="upload-text">Lendo documento com IA...</div><div class="upload-sub">Aguarde alguns segundos</div>';
+  dropEl.innerHTML = '<div class="upload-icon">🔍</div><div class="upload-text">Extraindo texto do PDF...</div><div class="upload-sub">Aguarde alguns segundos</div>';
 
   try {
     const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
@@ -1126,73 +1126,26 @@ async function processarArquivoOC(file) {
       return;
     }
 
-    // Converte para imagem PNG (via pdf.js se for PDF) e depois para base64
-    let imgFile = isPDF ? await pdfParaImagem(file) : await redimensionarImagem(file, 1800);
-    const base64 = await fileParaBase64(imgFile);
-    const mediaType = imgFile.type || 'image/png';
+    let texto = '';
 
-    // Chama a API da Anthropic para extrair os dados da OC
-    const prompt = `Você é um extrator de dados de Ordens de Compra (OC) brasileiras.
-Analise a imagem desta OC e extraia EXATAMENTE os seguintes campos em JSON puro (sem markdown, sem explicações):
-{
-  "numero_oc": "número da OC (só dígitos, ex: 12977)",
-  "numero_acao": "número da obra/ação (ex: 1844)",
-  "nome_obra": "nome da obra conforme consta no documento",
-  "fornecedor": "nome do fornecedor/empresa",
-  "cnpj_fornecedor": "CNPJ no formato XX.XXX.XXX/XXXX-XX",
-  "data_emissao": "data no formato YYYY-MM-DD",
-  "valor_total": número decimal (ex: 7081.24)
-}
-Se um campo não existir no documento, coloque null. Retorne APENAS o JSON, sem texto adicional.`;
-
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: prompt }
-          ]
-        }]
-      })
-    });
-
-    if (!resp.ok) throw new Error(`API HTTP ${resp.status}`);
-    const apiData = await resp.json();
-    const textoResposta = (apiData.content || []).map(b => b.text || '').join('').trim();
-
-    console.log('[Claude OCR] Resposta bruta:', textoResposta);
-
-    // Parse do JSON retornado pelo Claude
-    let dados = {};
-    try {
-      const jsonLimpo = textoResposta.replace(/```json|```/g, '').trim();
-      dados = JSON.parse(jsonLimpo);
-    } catch(e) {
-      console.warn('[Claude OCR] JSON inválido, tentando parsearOC no texto:', textoResposta);
-      dados = parsearOC(textoResposta);
+    if (isPDF) {
+      // Extrai texto nativo do PDF via pdf.js (100% local, sem internet)
+      texto = await extrairTextoPDF(file);
+    } else {
+      // Para imagens, tenta extrair via FileReader e parseia pelo nome do arquivo como fallback
+      App.toast('Para imagens, preencha manualmente os campos.', 'warning');
+      await mostrarFormOCManual('');
+      return;
     }
 
-    // Normaliza data para YYYY-MM-DD se vier em outro formato
-    if (dados.data_emissao && dados.data_emissao.includes('/')) {
-      const [dd, mm, aaaa] = dados.data_emissao.split('/');
-      dados.data_emissao = `${aaaa}-${mm}-${dd}`;
+    if (!texto || texto.trim().length < 20) {
+      throw new Error('Não foi possível extrair texto do PDF.');
     }
 
-    // Normaliza valor_total para número
-    if (typeof dados.valor_total === 'string') {
-      dados.valor_total = parseFloat(dados.valor_total.replace(/\./g,'').replace(',','.')) || null;
-    }
-
-    // Remove nulls explícitos para não sobrescrever campos com null
-    Object.keys(dados).forEach(k => { if (dados[k] === null) delete dados[k]; });
-
-    console.log('[Claude OCR] Dados extraídos:', dados);
-    window._ocrTexto = textoResposta;
+    console.log('[PDF.js] Texto extraído:\n', texto);
+    window._ocrTexto = texto;
+    const dados = parsearOC(texto);
+    console.log('[PDF.js] Dados parseados:', dados);
     await exibirPreviewOC(dados, file.name);
 
   } catch(err) {
@@ -1203,14 +1156,47 @@ Se um campo não existir no documento, coloque null. Retorne APENAS o JSON, sem 
   }
 }
 
-// Converte File para base64 puro (sem o prefixo data:...)
-function fileParaBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+// Extrai texto nativo de todas as páginas do PDF usando pdf.js (sem API externa)
+async function extrairTextoPDF(file) {
+  const arrayBuffer = await file.arrayBuffer();
+
+  // Carrega pdf.js dinamicamente se ainda não estiver carregado
+  if (typeof pdfjsLib === 'undefined') {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload = () => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        resolve();
+      };
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  const textos = [];
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page    = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // Junta os itens de texto preservando espaços e quebras de linha
+    let linhaAtual = '';
+    let yAtual = null;
+    for (const item of content.items) {
+      const y = Math.round(item.transform[5]);
+      if (yAtual !== null && Math.abs(y - yAtual) > 3) {
+        textos.push(linhaAtual.trim());
+        linhaAtual = '';
+      }
+      linhaAtual += (linhaAtual ? ' ' : '') + item.str;
+      yAtual = y;
+    }
+    if (linhaAtual.trim()) textos.push(linhaAtual.trim());
+  }
+
+  return textos.filter(l => l.length > 0).join('\n');
 }
 
 function redimensionarImagem(file, maxDim) {
